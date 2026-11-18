@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Klotski de poliominós</title>
+<style>
+:root{--bg:#e4e8ee;--panel:#f6f7f9;--ink:#1b2230;--mute:#5b667a;--line:#c9d0dc;--btn:#fff;--acc:#2f5bea;--frame:#232c3f;--slot:#2d3850;--coral:#ff5a5f}
+html[data-theme=dark]{--bg:#0e1118;--panel:#171c28;--ink:#e8ebf2;--mute:#8e99ae;--line:#2a3347;--btn:#1f2636;--acc:#6b8cff;--frame:#0a0d14;--slot:#1a2132}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-tap-highlight-color:transparent}
+header{display:flex;align-items:center;gap:12px;padding:14px 20px 4px;max-width:960px;margin:0 auto}
+h1{margin:0;font:700 26px/1 Rockwell,"Roboto Slab",Cambria,Georgia,serif;letter-spacing:-.01em}
+#phaseLbl{color:var(--mute);flex:1}
+main{display:grid;gap:18px;padding:10px 20px 28px;max-width:960px;margin:0 auto;justify-content:center}
+@media(min-width:768px){main{grid-template-columns:auto 340px;align-items:start}}
+#frame{background:var(--frame);padding:10px;border-radius:16px;width:max-content;max-width:100%;box-shadow:0 10px 30px rgba(10,20,40,.25);touch-action:none}
+#board{position:relative;display:grid;grid-template-columns:repeat(5,1fr);grid-template-rows:repeat(4,1fr);touch-action:none;user-select:none}
+.slot{background:var(--slot);border-radius:6px;margin:1.5px;position:relative}
+.slot.o::after,.slot.m::after{content:"";position:absolute;inset:24%;border:2px solid var(--coral);border-radius:50%;opacity:.75}
+.slot.m::after{border-style:dashed}
+#msg{margin-top:12px;min-height:44px;color:var(--ink);max-width:calc(var(--bw,360px) + 20px)}
+aside{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:14px;display:grid;gap:12px}
+.bar,.row{display:flex;flex-wrap:wrap;gap:8px}
+button{font:inherit;color:var(--ink);background:var(--btn);border:1px solid var(--line);border-radius:10px;padding:8px 12px;cursor:pointer;min-height:40px}
+button:hover:not(:disabled){border-color:var(--acc)}
+button:disabled{opacity:.4;cursor:not-allowed}
+button.primary{background:var(--acc);border-color:var(--acc);color:#fff;font-weight:600}
+button.primary:disabled{background:var(--btn);color:var(--mute);border-color:var(--line)}
+:focus-visible{outline:3px solid var(--acc);outline-offset:2px}
+#theme{margin-left:auto;padding:6px 10px}
+#tray{display:flex;flex-wrap:wrap;gap:14px;align-items:flex-start;justify-content:center;padding:12px;min-height:80px;background:var(--frame);border-radius:12px}
+#tray:empty::before{content:"Bandeja vacía";color:#8e99ae;align-self:center}
+.piece{position:absolute;filter:drop-shadow(0 2px 1.5px rgba(0,0,0,.4));touch-action:none;cursor:grab}
+#tray .piece{position:relative;flex:none}
+.c{position:absolute;background:var(--col)}
+.tg .c{border-radius:50%!important;background:radial-gradient(circle at 35% 30%,#ffc0bd,var(--col) 55%,#c8203d);box-shadow:0 0 0 2px #fff6,0 0 16px 2px rgba(255,90,95,.65)}
+.piece.sel{filter:drop-shadow(0 0 2px #fff) drop-shadow(0 0 2px #fff) drop-shadow(0 3px 3px rgba(0,0,0,.4))}
+.piece.hint{animation:pulse 1s ease-in-out infinite}
+@keyframes pulse{50%{filter:drop-shadow(0 0 9px #fff) drop-shadow(0 0 5px #fff)}}
+.piece.drag{z-index:6;cursor:grabbing}
+.piece.float{position:fixed;pointer-events:none;z-index:60;opacity:.95;transform:scale(1.04)}
+.piece.ghost{pointer-events:none;z-index:4;filter:none}
+.ghost.ok .c{background:rgba(34,197,94,.6)}
+.ghost.bad .c{background:rgba(239,68,68,.55)}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;text-align:center}
+.stats b{display:block;font:700 20px Rockwell,Cambria,Georgia,serif}
+.stats span{color:var(--mute);font-size:13px}
+.dpad{display:grid;grid-template-columns:repeat(3,48px);grid-template-rows:repeat(2,48px);gap:6px;justify-content:center}
+.dpad button{padding:0;font-size:18px;min-height:0}
+.dpad [data-d=u]{grid-column:2}.dpad [data-d=l]{grid-row:2;grid-column:1}.dpad [data-d=d]{grid-row:2;grid-column:2}.dpad [data-d=r]{grid-row:2;grid-column:3}
+#modal{position:fixed;inset:0;background:rgba(8,12,22,.6);display:grid;place-items:center;z-index:100;padding:20px}
+#modal[hidden]{display:none}
+.card{background:var(--panel);border-radius:18px;padding:26px;max-width:340px;width:100%;text-align:center;display:grid;gap:10px;box-shadow:0 20px 50px rgba(0,0,0,.4)}
+.card h2{margin:0;font:700 28px Rockwell,Cambria,Georgia,serif}
+.conf{position:fixed;top:-12px;width:9px;height:14px;border-radius:2px;opacity:.9;animation:fall linear forwards;pointer-events:none;z-index:101}
+@keyframes fall{to{transform:translateY(105vh) rotate(540deg)}}
+@media(prefers-reduced-motion:reduce){.conf{display:none}.piece.hint{animation:none;filter:drop-shadow(0 0 8px #fff)}}
+</style>
+</head>
+<body>
+<header>
+  <h1>Klotski</h1>
+  <div id="phaseLbl"></div>
+  <button id="theme" aria-label="Cambiar tema claro u oscuro">◐ Tema</button>
+</header>
+<main>
+  <section>
+    <div id="frame"><div id="board"></div></div>
+    <div id="msg" role="status" aria-live="polite"></div>
+  </section>
+  <aside>
+    <div id="p1" style="display:grid;gap:12px">
+      <div class="bar">
+        <button id="bRot" title="Rotar 90° (R o doble toque)">Rotar 90° (R)</button>
+        <button id="bFlip" title="Voltear (F)">Espejo (F)</button>
+        <button id="bOut" title="Devolver a la bandeja (Supr)">Quitar</button>
+      </div>
+      <div id="tray"></div>
+      <div class="row"><button id="bClr">Vaciar tablero</button></div>
+      <button id="bPlay" class="primary">Jugar</button>
+    </div>
+    <div id="p2" hidden style="display:grid;gap:12px">
+      <div class="stats"><div><b id="sM">0</b><span>Movimientos</span></div><div><b id="sT">0:00</b><span>Tiempo</span></div><div><b id="sB">–</b><span>Récord</span></div></div>
+      <div class="dpad" aria-label="Mover la pieza seleccionada">
+        <button data-d="u" aria-label="Arriba">▲</button><button data-d="l" aria-label="Izquierda">◀</button><button data-d="d" aria-label="Abajo">▼</button><button data-d="r" aria-label="Derecha">▶</button>
+      </div>
+      <div class="row"><button id="bHint" class="primary">Pista / ¿Tiene solución?</button></div>
+      <div class="row"><button id="bUndo">Deshacer</button><button id="bRes">Reiniciar</button><button id="bEdit">Editar tablero</button></div>
+    </div>
+  </aside>
+</main>
+<div id="modal" hidden>
+  <div class="card" role="dialog" aria-modal="true" aria-labelledby="mT">
+    <h2 id="mT">¡Resuelto!</h2>
+    <div id="mB"></div>
+    <button id="mAgain" class="primary">Jugar de nuevo</button>
+    <button id="mEdit">Editar tablero</button>
+  </div>
+</div>
+<script>
+"use strict";
+const R=4,C=5,$=s=>document.querySelector(s);
+const BASE={sq:[[0,0],[0,1],[1,0],[1,1]],l3:[[0,0],[1,0],[1,1]],l4:[[0,0],[1,0],[2,0],[2,1]],t4:[[0,0],[0,1],[0,2],[1,1]],target:[[0,0]]};
+const META={sq:{n:"el cuadrado",col:"#f59e0b"},l3:{n:"la L pequeña",col:"#10b981"},l4:{n:"la L grande",col:"#2563eb"},t4:{n:"la T",col:"#8b5cf6"},target:{n:"el círculo",col:"#ff4d4f"}};
+const IDS=Object.keys(BASE),DIRS=[[0,1],[0,-1],[1,0],[-1,0]],ARW={"0,1":"→","0,-1":"←","1,0":"↓","-1,0":"↑"};
+const P=IDS.map(id=>({id,cells:BASE[id].map(x=>x.slice()),r:0,c:0,placed:false}));
+let phase=1,sel=null,cell=80,tc=36,moves=0,elapsed=0,t0=0,timer=null,hist=[],startSnap=null,hintId=null,hintTxt="",note="",won=false,drag=null,lastTap={id:null,t:0};
+const board=$("#board"),tray=$("#tray");
+const get=id=>P.find(p=>p.id===id);
+const dims=cs=>[Math.max(...cs.map(x=>x[0]))+1,Math.max(...cs.map(x=>x[1]))+1];
+const norm=cs=>{const a=Math.min(...cs.map(x=>x[0])),b=Math.min(...cs.map(x=>x[1]));return cs.map(([r,c])=>[r-a,c-b])};
+const rot=cs=>{const H=dims(cs)[0];return norm(cs.map(([r,c])=>[c,H-1-r]))};
+const flip=cs=>{const W=dims(cs)[1];return norm(cs.map(([r,c])=>[r,W-1-c]))};
+const occ=skip=>{const g=Array.from({length:R},()=>Array(C).fill(null));for(const p of P)if(p.placed&&p!==skip)for(const[r,c]of p.cells)g[p.r+r][p.c+c]=p.id;return g};
+const fits=(p,r,c,g)=>p.cells.every(([a,b])=>{const y=r+a,x=c+b;return y>=0&&y<R&&x>=0&&x<C&&!g[y][x]});
+const fmt=ms=>{const s=Math.floor(ms/1000);return Math.floor(s/60)+":"+String(s%60).padStart(2,"0")};
+const store={get(k){try{return JSON.parse(localStorage.getItem(k))}catch(e){return null}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
+
+/* ---------- Construcción del tablero y de las piezas ---------- */
+for(let r=0;r<R;r++)for(let c=0;c<C;c++){const d=document.createElement("div");d.className="slot"+(r==0&&c==4?" o":"")+(r==3&&c==0?" m":"");board.append(d)}
+
+function pieceEl(p,s){
+  const set=new Set(p.cells.map(x=>x+"")),has=(r,c)=>set.has(r+","+c);
+  const [h,w]=dims(p.cells),el=document.createElement("div");
+  el.className="piece"+(p.id=="target"?" tg":"")+(sel==p.id?" sel":"")+(hintId==p.id?" hint":"");
+  el.style.width=w*s+"px";el.style.height=h*s+"px";el.style.setProperty("--col",META[p.id].col);
+  const g=Math.max(2,s*.045),rad=s*.24;
+  for(const[r,c]of p.cells){
+    const U=has(r-1,c),D=has(r+1,c),L=has(r,c-1),Rt=has(r,c+1),d=document.createElement("div");
+    const l=L?-.5:g,rt=Rt?-.5:g,t=U?-.5:g,b=D?-.5:g;
+    d.className="c";
+    Object.assign(d.style,{left:c*s+l+"px",top:r*s+t+"px",width:s-l-rt+"px",height:s-t-b+"px",
+      borderRadius:[!U&&!L,!U&&!Rt,!D&&!Rt,!D&&!L].map(v=>v?rad+"px":"0").join(" ")});
+    el.append(d);
+  }
+  el.addEventListener("pointerdown",e=>down(e,p));
+  return el;
+}
+
+function ready(){return P.every(p=>p.placed)&&get("target").r==0&&get("target").c==4}
+
+function render(){
+  board.querySelectorAll(".piece").forEach(e=>e.remove());tray.innerHTML="";
+  for(const p of P){
+    if(p.placed){const e=pieceEl(p,cell);e.style.left=p.c*cell+"px";e.style.top=p.r*cell+"px";board.append(e)}
+    else if(phase==1)tray.append(pieceEl(p,tc));
+  }
+  const one=phase==1;
+  $("#p1").hidden=!one;$("#p2").hidden=one;
+  $("#phaseLbl").textContent=one?"Fase 1: construcción":"Fase 2: resolución";
+  $("#bRot").disabled=$("#bFlip").disabled=!sel;$("#bOut").disabled=!(sel&&get(sel)&&get(sel).placed);
+  $("#bPlay").disabled=!ready();
+  $("#sM").textContent=moves;$("#sT").textContent=fmt(elapsed);
+  const b=store.get("klotski.best");$("#sB").textContent=b?b.m+" mov":"–";
+  $("#bUndo").disabled=!hist.length||won;
+  let def;
+  if(one){const n=P.filter(p=>!p.placed).length;
+    def=n?`Arrastra las ${n} pieza${n>1?"s":""} restante${n>1?"s":""} al tablero. Toca una pieza para rotarla o voltearla.`
+      :(ready()?"Todo listo: pulsa Jugar.":"Coloca el círculo rojo en la esquina superior derecha (anillo rojo).");
+  }else def="Lleva el círculo rojo a la esquina inferior izquierda (anillo discontinuo).";
+  $("#msg").textContent=note||(!one&&hintTxt)||def;note="";
+}
+const say=t=>{note=t;render()};
+
+function layout(){
+  const W=innerWidth,H=innerHeight,mob=W<768;
+  cell=mob?Math.max(40,Math.min(96,Math.floor((W-60)/5))):Math.max(56,Math.min(112,Math.floor((W-480)/5),Math.floor((H-200)/4)));
+  tc=mob?Math.max(22,Math.min(38,Math.floor((W-110)/10))):40;
+  board.style.width=cell*C+"px";board.style.height=cell*R+"px";
+  document.documentElement.style.setProperty("--bw",cell*C+"px");
+  render();
+}
+
+/* ---------- Interacción con Pointer Events ---------- */
+function down(e,p){
+  if(won||drag)return;
+  e.preventDefault();
+  const el=e.currentTarget,rc=el.getBoundingClientRect();
+  el.setPointerCapture(e.pointerId);
+  drag={p,el,id:e.pointerId,x0:e.clientX,y0:e.clientY,moved:false,ox:e.clientX-rc.left,oy:e.clientY-rc.top,from:p.placed,tx:0,ty:0};
+  if(phase==2){
+    const g=occ(p),rg=(dr,dc)=>{let k=0;while(fits(p,p.r+dr*(k+1),p.c+dc*(k+1),g))k++;return k};
+    drag.rg={L:rg(0,-1),R:rg(0,1),U:rg(-1,0),D:rg(1,0)};drag.axis=null;
+  }
+  el.addEventListener("pointermove",move);el.addEventListener("pointerup",up);el.addEventListener("pointercancel",up);
+}
+
+function move(e){
+  const d=drag;if(!d||e.pointerId!==d.id)return;
+  const dx=e.clientX-d.x0,dy=e.clientY-d.y0;
+  if(phase==2){
+    if(!d.moved&&Math.hypot(dx,dy)<5)return;
+    d.moved=true;
+    if(!d.axis||Math.hypot(dx,dy)<cell*.2)d.axis=Math.abs(dx)>Math.abs(dy)?"x":"y";
+    d.tx=d.ty=0;
+    if(d.axis=="x")d.tx=Math.max(-d.rg.L*cell,Math.min(d.rg.R*cell,dx));
+    else d.ty=Math.max(-d.rg.U*cell,Math.min(d.rg.D*cell,dy));
+    d.el.classList.add("drag");d.el.style.transform=`translate(${d.tx}px,${d.ty}px)`;
+    return;
+  }
+  if(!d.moved&&Math.hypot(dx,dy)<6)return;
+  if(!d.moved){
+    d.moved=true;
+    d.fl=pieceEl(d.p,cell);d.fl.classList.add("float");document.body.append(d.fl);
+    d.gh=pieceEl(d.p,cell);d.gh.classList.add("ghost");board.append(d.gh);
+    d.el.style.opacity=.3;
+    if(!d.from){const[h,w]=dims(d.p.cells);d.ox=w*cell/2;d.oy=h*cell/2}
+  }
+  const fx=e.clientX-d.ox,fy=e.clientY-d.oy,b=board.getBoundingClientRect();
+  d.fl.style.left=fx+"px";d.fl.style.top=fy+"px";
+  d.r=Math.round((fy-b.top)/cell);d.c=Math.round((fx-b.left)/cell);
+  d.show=e.clientX>b.left-cell/2&&e.clientX<b.right+cell/2&&e.clientY>b.top-cell/2&&e.clientY<b.bottom+cell/2;
+  d.ok=fits(d.p,d.r,d.c,occ(d.p));
+  d.gh.style.display=d.show?"":"none";
+  d.gh.className="piece ghost"+(d.p.id=="target"?" tg":"")+(d.ok?" ok":" bad");
+  d.gh.style.left=d.c*cell+"px";d.gh.style.top=d.r*cell+"px";
+}
+
+function up(e){
+  const d=drag;if(!d||e.pointerId!==d.id)return;
+  drag=null;const p=d.p;
+  if(d.fl)d.fl.remove();if(d.gh)d.gh.remove();
+  if(phase==2){
+    if(!d.moved){sel=p.id;return render()}
+    const sx=Math.round(d.tx/cell),sy=Math.round(d.ty/cell);
+    sel=p.id;
+    return (sx||sy)?slide(p,p.r+sy,p.c+sx):render();
+  }
+  if(!d.moved){
+    const now=Date.now();
+    if(lastTap.id==p.id&&now-lastTap.t<350){sel=p.id;lastTap={id:null,t:0};return xform(rot)}
+    lastTap={id:p.id,t:now};sel=p.id;return render();
+  }
+  const tr=tray.getBoundingClientRect(),over=e.clientX>=tr.left&&e.clientX<=tr.right&&e.clientY>=tr.top&&e.clientY<=tr.bottom;
+  if(d.show&&d.ok){p.placed=true;p.r=d.r;p.c=d.c}
+  else if(over||!d.from)p.placed=false;
+  sel=p.id;render();
+}
+
+function xform(f){
+  const p=get(sel);if(!p||phase!=1)return;
+  const n=f(p.cells);
+  if(p.placed){
+    const g=occ(p);let found=null;
+    for(const[dr,dc]of [[0,0],[0,-1],[0,1],[-1,0],[1,0],[-1,-1],[-1,1],[1,-1],[1,1],[0,-2],[0,2],[-2,0],[2,0]])
+      if(fits({cells:n},p.r+dr,p.c+dc,g)){found=[p.r+dr,p.c+dc];break}
+    if(!found)return say("No cabe ahí: libera espacio o devuelve la pieza a la bandeja.");
+    p.r=found[0];p.c=found[1];
+  }
+  p.cells=n;render();
+}
+
+/* ---------- Movimiento en fase 2 ---------- */
+const startTimer=()=>{if(!timer){t0=Date.now()-elapsed;timer=setInterval(()=>{elapsed=Date.now()-t0;$("#sT").textContent=fmt(elapsed)},250)}};
+const stopTimer=()=>{clearInterval(timer);timer=null};
+function slide(p,r,c){
+  hist.push({pos:P.map(q=>[q.r,q.c]),moves});
+  p.r=r;p.c=c;moves++;hintId=null;hintTxt="";startTimer();
+  if(P[4].r==3&&P[4].c==0)return win();
+  render();
+}
+function nudge(dr,dc){
+  const p=get(sel);
+  if(!p)return say("Selecciona primero una pieza.");
+  if(!fits(p,p.r+dr,p.c+dc,occ(p)))return say("Esa pieza no puede moverse en esa dirección.");
+  slide(p,p.r+dr,p.c+dc);
+}
+function undo(){
+  if(phase!=2||!hist.length||won)return;
+  const h=hist.pop();P.forEach((q,i)=>{q.r=h.pos[i][0];q.c=h.pos[i][1]});moves=h.moves;hintId=null;hintTxt="";render();
+}
+function win(){
+  stopTimer();won=true;render();
+  const b=store.get("klotski.best")||{m:1e9,t:1e12};
+  const rec=moves<b.m||elapsed<b.t;
+  store.set("klotski.best",{m:Math.min(b.m,moves),t:Math.min(b.t,elapsed)});
+  $("#mB").innerHTML=`<p>Lo lograste en <b>${moves}</b> movimientos y <b>${fmt(elapsed)}</b>.</p><p>${rec?"¡Nuevo récord!":"Tu récord: "+b.m+" mov. y "+fmt(b.t)+"."}</p>`;
+  $("#modal").hidden=false;$("#mAgain").focus();$("#sB").textContent=Math.min(b.m,moves)+" mov";
+  const cols=Object.values(META).map(m=>m.col);
+  for(let i=0;i<40;i++){const c=document.createElement("i");c.className="conf";
+    Object.assign(c.style,{left:Math.random()*100+"vw",background:cols[i%5],animationDuration:2+Math.random()*1.8+"s",animationDelay:Math.random()*.6+"s"});
+    document.body.append(c);setTimeout(()=>c.remove(),4800)}
+}
+
+/* ---------- Solucionador BFS (un movimiento = deslizar una pieza en línea recta) ---------- */
+function solve(){
+  const sh=P.map(q=>q.cells),start=P.map(q=>q.r*C+q.c),key=s=>s.join();
+  if(start[4]==3*C)return[];
+  const par=new Map([[key(start),null]]),q=[start];let head=0,goal=null;
+  outer:while(head<q.length){
+    const s=q[head++];
+    const masks=sh.map((cs,i)=>cs.reduce((m,[r,c])=>m|(1<<(((s[i]/C|0)+r)*C+s[i]%C+c)),0));
+    for(let i=0;i<P.length;i++){
+      let o=0;masks.forEach((m,j)=>{if(j!=i)o|=m});
+      const r0=s[i]/C|0,c0=s[i]%C;
+      for(const[dr,dc]of DIRS)for(let k=1;;k++){
+        if(!sh[i].every(([a,b])=>{const y=r0+a+dr*k,x=c0+b+dc*k;return y>=0&&y<R&&x>=0&&x<C&&!((o>>(y*C+x))&1)}))break;
+        const t=s.slice();t[i]=(r0+dr*k)*C+c0+dc*k;const kk=key(t);
+        if(par.has(kk))continue;
+        par.set(kk,{prev:s,i,dr,dc,k});q.push(t);
+        if(t[4]==3*C){goal=t;break outer}
+      }
+    }
+  }
+  if(!goal)return null;
+  const path=[];let cur=goal,e;
+  while((e=par.get(key(cur)))){path.push(e);cur=e.prev}
+  return path.reverse();
+}
+function hint(){
+  if(won)return;
+  $("#msg").textContent="Calculando…";
+  setTimeout(()=>{
+    const path=solve();
+    if(path===null){hintId=null;hintTxt="Esta configuración no tiene solución: el círculo nunca podrá llegar a la esquina inferior izquierda. Pulsa Editar tablero para cambiarla.";return render()}
+    const m=path[0],id=P[m.i].id;
+    hintId=id;sel=id;
+    hintTxt=`Se resuelve en ${path.length} movimiento${path.length>1?"s":""} como mínimo. Siguiente: mueve ${META[id].n} ${ARW[m.dr+","+m.dc]} ${m.k} casilla${m.k>1?"s":""}.`;
+    render();
+  },30);
+}
+
+/* ---------- Control de fases ---------- */
+function play(){
+  if(!ready())return;
+  startSnap=P.map(q=>[q.r,q.c]);phase=2;sel=null;restartState();render();
+}
+function restartState(){stopTimer();moves=0;elapsed=0;hist=[];hintId=null;hintTxt="";won=false;$("#modal").hidden=true}
+function restart(){
+  if(!startSnap)return;
+  P.forEach((q,i)=>{q.r=startSnap[i][0];q.c=startSnap[i][1]});restartState();render();
+}
+function edit(){stopTimer();restartState();phase=1;render()}
+function clearAll(){P.forEach(q=>{q.placed=false;q.cells=BASE[q.id].map(x=>x.slice())});sel=null;render()}
+
+$("#bRot").onclick=()=>xform(rot);
+$("#bFlip").onclick=()=>xform(flip);
+$("#bOut").onclick=()=>{const p=get(sel);if(p){p.placed=false;render()}};
+$("#bClr").onclick=clearAll;$("#bPlay").onclick=play;
+$("#bHint").onclick=hint;$("#bUndo").onclick=undo;$("#bRes").onclick=restart;$("#bEdit").onclick=edit;
+$("#mAgain").onclick=restart;$("#mEdit").onclick=edit;
+document.querySelectorAll(".dpad button").forEach(b=>b.onclick=()=>{
+  const m={u:[-1,0],d:[1,0],l:[0,-1],r:[0,1]}[b.dataset.d];if(phase==2&&!won)nudge(...m)});
+addEventListener("keydown",e=>{
+  const k=e.key.toLowerCase();
+  if((e.ctrlKey||e.metaKey)&&k=="z"){e.preventDefault();return undo()}
+  if(e.ctrlKey||e.metaKey||e.altKey||won)return;
+  if(phase==1){
+    if(k=="r")xform(rot);else if(k=="f")xform(flip);
+    else if((k=="delete"||k=="backspace")&&sel&&get(sel).placed){get(sel).placed=false;render()}
+  }else if(k.startsWith("arrow")){
+    e.preventDefault();
+    nudge(...{arrowup:[-1,0],arrowdown:[1,0],arrowleft:[0,-1],arrowright:[0,1]}[k]);
+  }
+});
+
+/* ---------- Tema y arranque ---------- */
+function setTheme(t){document.documentElement.dataset.theme=t;store.set("klotski.theme",t)}
+setTheme(store.get("klotski.theme")||(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"));
+$("#theme").onclick=()=>setTheme(document.documentElement.dataset.theme=="dark"?"light":"dark");
+let rz;addEventListener("resize",()=>{clearTimeout(rz);rz=setTimeout(()=>{if(!drag)layout()},80)});
+layout();
+</script>
+</body>
+</html>
